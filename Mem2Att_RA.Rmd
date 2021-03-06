@@ -1,0 +1,390 @@
+---
+title: "Mem2Att_Study_Analyses_RA"
+output: html_document
+---
+
+Path for files:
+/oak/stanford/groups/awagner/marcharr/MU4/study_files/
+
+*If you don't have these packages on your computer make sure to down them first*
+
+```{r}
+# load packages
+library(lme4)
+library(emmeans)
+library(tidyverse)
+
+```
+
+*This allows you to set a clear background for plots*
+
+```{r}
+theme_set(theme_classic() +
+            theme(text = element_text(size = 12)))
+```
+
+*load datasets into a dataframe*
+
+```{r}
+## set path
+curr_dir = '/Users/madisonhunt/Desktop/Oak/MU4/study_files'
+setwd(curr_dir)
+file_list <- list.files(curr_dir,  pattern = '*.txt')
+
+data = data.frame()
+
+for (x in 1:length(file_list)){
+  temp <- read.delim(file_list[x])
+     if (grepl('study1study', file_list[x], fixed=TRUE)){
+            temp$StudyRep = 1
+     }
+   if (grepl('study2study', file_list[x], fixed=TRUE)){
+            temp$StudyRep = 2
+   }
+   if (grepl('study3study', file_list[x], fixed=TRUE)){
+            temp$StudyRep = 3
+    }
+    if (grepl('study4study', file_list[x], fixed=TRUE)){
+            temp$StudyRep = 4
+    }
+  data <- rbind(data, temp)
+  x=x+1
+}
+
+print(data) 
+
+```
+
+
+
+*Produce the median RT for each run*
+
+```{r}
+##median RT for all subject for each run (ASER)
+RT_run1 <- subset(data, data$StudyRep == 1, c(SubjNum, RT))
+med_RT1 = median(RT_run1[,2])
+print(med_RT1)
+
+RT_run2 <- subset(data, data$StudyRep == 2, c(SubjNum, RT))
+med_RT2 = median(RT_run2[,2])
+print(med_RT2)
+
+RT_run3 <- subset(data, data$StudyRep == 3, c(SubjNum, RT))
+med_RT3 = median(RT_run3[,2])
+print(med_RT3)
+
+RT_run4 <- subset(data, data$StudyRep == 4, c(SubjNum, RT))
+med_RT4 = median(RT_run4[,2])
+print(med_RT4)
+```
+
+
+```{r}
+##median RT, ASER, for only correct trials
+RT_run1 <- subset(data, (data$StudyRep == 1 & (data$Accuracy== 'correct Present' | data$Accuracy == 'correct Absent')), c(SubjNum, StudyRep, StudyCateg, RT))
+med_RT1 = median(RT_run1[,2])
+print(med_RT1)
+
+RT_run2 <- subset(data, (data$StudyRep == 2 & (data$Accuracy== 'correct Present' | data$Accuracy == 'correct Absent')), c(SubjNum, StudyRep, StudyCateg, RT))
+med_RT2 = median(RT_run2[,2])
+print(med_RT2)
+
+RT_run3 <- subset(data, (data$StudyRep == 3 & (data$Accuracy== 'correct Present' | data$Accuracy == 'correct Absent')), c(SubjNum, StudyRep, StudyCateg, RT))
+med_RT3 = median(RT_run3[,2])
+print(med_RT3)
+
+RT_run4 <- subset(data, (data$StudyRep == 4 & (data$Accuracy== 'correct Present' | data$Accuracy == 'correct Absent')), c(SubjNum, StudyRep, StudyCateg, RT))
+med_RT4 = median(RT_run4[,2])
+print(med_RT4)
+```
+
+
+```{r}
+##median RT, for every subject for each run (ESER), for only correct trials. Note any potential outliers don't get better (decrease in RT across blocks is minimal) really high RT
+
+RT_data1 <- data.frame()
+RT_data2 <- data.frame()
+RT_data3 <- data.frame()
+RT_data4 <- data.frame()
+
+for (pt in unique(data$SubjNum)){
+  temp1 <- subset(data, (data$SubjNum == pt & data$StudyRep == 1 & (data$Accuracy== 'correct Present' | data$Accuracy == 'correct     Absent')), c(SubjNum, RT))
+  temp2 <- pt
+  temp2[2] <- median(temp1[,2])
+  RT_data1 <- rbind(RT_data1, temp2)
+}
+
+for (pt in unique(data$SubjNum)){
+  temp1 <- subset(data, (data$SubjNum == pt & data$StudyRep == 2 & (data$Accuracy== 'correct Present' | data$Accuracy == 'correct     Absent')), c(SubjNum, RT))
+  temp2[1] <- pt
+  temp2[2] <- median(temp1[,2])
+  RT_data2 <- rbind(RT_data2, temp2)
+}
+
+for (pt in unique(data$SubjNum)){
+  temp1 <- subset(data, (data$SubjNum == pt & data$StudyRep == 3 & (data$Accuracy== 'correct Present' | data$Accuracy == 'correct     Absent')), c(SubjNum, RT))
+  temp2[1] <- pt
+  temp2[2] <- median(temp1[,2])
+  RT_data3 <- rbind(RT_data3, temp2)
+}
+
+for (pt in unique(data$SubjNum)){
+  temp1 <- subset(data, (data$SubjNum == pt & data$StudyRep == 4 & (data$Accuracy== 'correct Present' | data$Accuracy == 'correct     Absent')), c(SubjNum, RT))
+  temp2[1] <- pt
+  temp2[2] <- median(temp1[,2])
+  RT_data4 <- rbind(RT_data4, temp2)
+}
+
+RT_data <- merge(RT_data1, RT_data2, by = 1)
+RT_data <- merge(RT_data, RT_data3, by = 1)
+RT_data <- merge(RT_data, RT_data4, by = 1)
+print(RT_data)
+
+##rename columns?
+```
+
+Generate a facet grid plot for median RT for Study Category for the first run and the last run for each participant. What is the purpose of this exercise?
+You should be looking for two qualities across participants
+The distributions should shrink from the first study block to the last 
+The median RT for each category should overlap in the last study block
+Report any potential outliers (fail to meet criteria i or ii)
+
+```{r}
+## first make a new dataframe with the correct info
+
+RT_by_categ <- subset(data, ((data$StudyRep == 1 | data$StudyRep == 4) & (data$Accuracy== 'correct Present' | data$Accuracy == 'correct     Absent')), c(SubjNum, StudyRep, StudyCateg, RT))
+
+RT_cat <- data.frame(SubjNum = NA,
+                     StudyRep = NA, 
+                     StudyCateg = NA, 
+                     MedianRT= NA)
+
+
+for (s in unique(RT_by_categ$SubjNum)){{
+  for (r in unique(RT_by_categ$StudyRep))
+    for (ca in unique(RT_by_categ$StudyCateg)) {
+     temp3 <- subset(RT_by_categ, (RT_by_categ$StudyCateg == ca & RT_by_categ$StudyRep == r & RT_by_categ$SubjNum == s), c(RT))
+     temp4 <- c(s, r, ca, (median(temp3[2, ])))
+     RT_cat <- rbind(RT_cat, temp4)
+
+    }
+  }
+}
+
+RT_cat$MedianRT <- as.numeric(RT_cat$MedianRT)
+print(RT_cat)
+```
+
+
+```{r}
+# create graph
+RT_A <- subset(RT_cat, RT_cat$StudyCateg == 'A', c(SubjNum, StudyRep, MedianRT)) 
+print(RT_A)
+ggplot(data=RT_A, aes(x= StudyRep, y= MedianRT, group=SubjNum)) +
+         geom_line() +
+         geom_point()
+
+RT_S <- subset(RT_cat, RT_cat$StudyCateg == 'S', c(SubjNum, StudyRep, MedianRT)) 
+print(RT_S)
+ggplot(data=RT_S, aes(x= StudyRep, y= MedianRT, group=SubjNum)) +
+         geom_line() +
+         geom_point()
+
+RT_F <- subset(RT_cat, RT_cat$StudyCateg == 'F', c(SubjNum, StudyRep, MedianRT)) 
+print(RT_F)
+ggplot(data=RT_F, aes(x= StudyRep, y= MedianRT, group=SubjNum)) +
+         geom_line() +
+         geom_point()
+```
+
+Looks at the median RT for object quadrant for Study block 1-4
+Obj quadrant 1-4 correspond to four squares that partition the scene space into a cartesian plane. Obj quadrant 5 is the center of the screen.
+Think through what trends should be present for each block. Report any potential outliers. 
+
+```{r}
+## create data frame
+
+RT_quad <- subset(data, data$Accuracy== 'correct Present' | data$Accuracy == 'correct Absent', c(SubjNum, StudyRep, StudyCateg, ObjQuadrant, RT))
+
+med_RT_quad <- data.frame(SubjNum = NA, 
+                          StudyRep = NA, 
+                          ObjQuadrant = NA, 
+                          RT= NA )
+
+for (s in unique(RT_quad $SubjNum)){{
+  for (r in unique(RT_quad $StudyRep))
+    for (q in unique(RT_quad $ObjQuadrant)) {
+     temp5 <- subset(RT_quad , (RT_quad $ObjQuadrant == q & RT_quad $StudyRep == r & RT_quad $SubjNum == s), c(RT))
+     temp6 <- c(s, r, q, (median(temp5[2, ])))
+     med_RT_quad <- rbind(med_RT_quad, temp6)
+
+    }
+  }
+}
+
+print(med_RT_quad)
+```
+```{r}
+## now make graphs
+
+RT_quad0 <- subset(med_RT_quad, med_RT_quad$ObjQuadrant == 0, c(SubjNum, StudyRep, ObjQuadrant, RT))
+ggplot(RT_quad0, aes(x=StudyRep, y = RT, group = SubjNum)) +
+  geom_line() +
+  geom_point()
+
+RT_quad1 <- subset(med_RT_quad, med_RT_quad$ObjQuadrant == 1, c(SubjNum, StudyRep, ObjQuadrant, RT))
+ggplot(RT_quad1, aes(x=StudyRep, y = RT, group = SubjNum)) +
+  geom_line() +
+  geom_point()
+
+RT_quad2 <- subset(med_RT_quad, med_RT_quad$ObjQuadrant == 2, c(SubjNum, StudyRep, ObjQuadrant, RT))
+ggplot(RT_quad2, aes(x=StudyRep, y = RT, group = SubjNum)) +
+  geom_line() +
+  geom_point()
+
+RT_quad3 <- subset(med_RT_quad, med_RT_quad$ObjQuadrant == 3, c(SubjNum, StudyRep, ObjQuadrant, RT))
+ggplot(RT_quad3, aes(x=StudyRep, y = RT, group = SubjNum)) +
+  geom_line() +
+  geom_point()
+
+RT_quad4 <- subset(med_RT_quad, med_RT_quad$ObjQuadrant == 4, c(SubjNum, StudyRep, ObjQuadrant, RT))
+ggplot(RT_quad4, aes(x=StudyRep, y = RT, group = SubjNum)) +
+  geom_line() +
+  geom_point()
+```
+
+Next, looks at values for each subject, filter by correct trials for study block 1 and block 4, then:
+look at median RT, standard deviation (sd), mean RT
+look at the difference between median and mean values for block 1 vs. block 4...what do you see
+
+```{r}
+RT_sub_data_all <- subset(data, (data$StudyRep == 1 | data$StudyRep ==4) & (data$Accuracy == 'correct Present' | data$Accuracy == 'correct Absent'), c(SubjNum, StudyRep, RT))
+
+
+RT_sub_data <- data.frame(SubjNum= NA,
+                          StudyRep = NA,
+                          mean_rt= NA,
+                          median_rt = NA, 
+                          sd_rt = NA)
+
+for (s in unique(RT_sub_data_all$SubjNum)){
+  for (r in unique(RT_sub_data_all$StudyRep)){
+    temp <- subset(RT_sub_data_all, RT_sub_data_all$SubjNum == s & RT_sub_data_all$StudyRep == r, c(RT))
+    ## something is wrong because mean & median are the same and SD isn't working
+    mean_temp <- mean(temp[,1], na.rm = TRUE)
+    median_temp <- median(temp[,1], na.rm = TRUE)
+    sd_temp <- sd(temp[,1], na.rm = TRUE)
+    info_temp <- data.frame(SubjNum= s,
+                          StudyRep = r,
+                          mean_rt= mean_temp,
+                          median_rt = median_temp, 
+                          sd_rt = sd_temp)
+    
+    RT_sub_data <- rbind(RT_sub_data, info_temp)
+  }
+}
+
+print(RT_sub_data)
+
+ggplot(data=subset(RT_sub_data, (RT_sub_data$StudyRep == 1 | RT_sub_data$StudyRep == 4)), aes(x= StudyRep, y=median_rt, group = SubjNum))+
+  geom_line()+
+  geom_point()
+
+ggplot(data=subset(RT_sub_data, (RT_sub_data$StudyRep == 1 | RT_sub_data$StudyRep == 4)), aes(x= StudyRep, y=mean_rt, group = SubjNum))+
+  geom_line()+
+  geom_point()
+
+```
+
+then calculate the upper threshold for outliers (3 SD + above) the mean and median
+Save this file that contains all of values above per subject (i.e. median_RT,  mean_RT, SD, upper_med(3SD+median), upper_mean(3SD+mean)
+```{r}
+
+for (s in unique(RT_sub_data$SubjNum)){
+  upper_med <- RT_sub_data$median_rt + RT_sub_data$sd_rt * 3
+  RT_sub_data$upper_med <- upper_med
+  upper_mean <- RT_sub_data$mean_rt + RT_sub_data$sd_rt * 3
+  RT_sub_data$upper_mean <- upper_mean
+}
+
+print(RT_sub_data)
+
+write.csv(RT_sub_data, '/Users/madisonhunt/Documents/Data/RT_sub_data.csv')
+```
+
+
+Then subset the DF into two separate DFs for block 1 and block 4 for correct trials only 
+combine this with the newly saved file that contains upper_med, upper_mean
+Then create 4 DFs
+Study block 1 threshold by upper_med, upper_mean
+Study block 4 threshold by upper_med, upper_mean
+
+```{r}
+
+```
+
+*Plot histogram of correct responses for each study run + median x-intercept*
+
+```{r}
+c_RT_run1 <- subset(data, data$StudyRep == 1 & (data$Accuracy == 'correct Present' | data$Accuracy == 'correct Absent'), c(RT))
+c_RT_run2 <-subset(data, data$StudyRep == 2 & (data$Accuracy == 'correct Present' | data$Accuracy == 'correct Absent'), c(RT))
+c_RT_run3 <-subset(data, data$StudyRep == 3 &(data$Accuracy == 'correct Present' | data$Accuracy == 'correct Absent'), c(RT))
+c_RT_run4 <-subset(data, data$StudyRep == 4 &(data$Accuracy == 'correct Present' | data$Accuracy == 'correct Absent'), c(RT))
+
+hist(c_RT_run1[,1])
+ abline(v=med_RT1)
+hist(c_RT_run2[,1])
+  abline(v=med_RT2)
+hist(c_RT_run3[,1])
+  abline(v=med_RT3)
+hist(c_RT_run4[,1])
+  abline(v=med_RT4)
+```
+
+*Plot histogram of correct repose for each object category + median x-intercept*
+
+```{r}
+c_RT_A <- subset(data, data$StudyCateg == 'A' & (data$Accuracy == 'correct Present' | data$Accuracy == 'correct Absent'), c(RT))
+c_RT_F <-subset(data, data$StudyCateg == 'F' & (data$Accuracy == 'correct Present' | data$Accuracy == 'correct Absent'), c(RT))
+c_RT_S <-subset(data, data$StudyCateg == 'S' &(data$Accuracy == 'correct Present' | data$Accuracy == 'correct Absent'), c(RT))
+
+med_RT_A <- median(c_RT_A[, c(1)])
+med_RT_F <- median(c_RT_F[, c(1)])
+med_RT_S <- median(c_RT_S[, c(1)])
+
+
+
+hist(c_RT_A[,1])
+ abline(v=med_RT_A)
+hist(c_RT_F[,1])
+  abline(v=med_RT_F)
+hist(c_RT_S[,1])
+  abline(v=med_RT_S)
+
+```
+
+*Get table for responses (both incorrect and correct)* 
+*then split by study rep (i.e. run)*
+*then for study category overall*
+
+```{r}
+resp <- subset(data, select = c(StudyCateg, StudyRep, Accuracy))
+print(resp)
+
+resp_run1 <- subset(resp, resp$StudyRep == 1)
+print(resp_run1)
+resp_run2 <- subset(resp, resp$StudyRep == 2)
+print(resp_run2)
+resp_run3 <- subset(resp, resp$StudyRep == 3)
+print(resp_run3)
+resp_run4 <- subset(resp, resp$StudyRep == 4)
+print(resp_run4)
+
+resp_A <-subset(resp, resp$StudyCateg == 'A')
+print(resp_A)
+resp_F <-subset(resp, resp$StudyCateg == 'F')
+print(resp_F)
+resp_S <-subset(resp, resp$StudyCateg == 'S')
+print(resp_S)
+  
+```
